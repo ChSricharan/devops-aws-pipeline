@@ -1,0 +1,59 @@
+pipeline{
+    agent any
+
+    environment{
+        AWS_ACCESS_KEY_ID=credentials('aws-cred').username
+        AWS_SECRET_ACCESS_KEY=credentials('aws-cred').password
+    }
+
+    stages{
+
+        stage("Clone repo"){
+            steps{
+                checkout scm
+            }
+        }
+
+        stage("Build Docker Image"){
+            steps{
+                dir('docker'){
+                    sh "docker build -t sricharanchebolu/devops-app ."
+                }
+            }
+        }
+
+        stage("Docker Login"){
+    steps{
+        withCredentials([usernamePassword(
+            credentialsId: 'docker-cred',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+            sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
+        }
+    }
+}
+
+        stage("Push to Docker Hub"){
+            steps{
+                sh "docker push sricharanchebolu/devops-app"
+            }
+        }
+
+        stage("Terraform init"){
+            steps{
+                dir("terraform"){
+                    sh "terraform init"
+                }
+            }
+        }
+
+        stage("Terraform apply"){
+            steps{
+                dir('terraform'){
+                    sh 'terraform apply -auto-approve -var="key_name=devops-aws-pipeline"'
+                }
+            }
+        }
+    }
+}
